@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Leep Mixer</title>
+	<link rel="stylesheet" type="text/css" href="css/main.css" />
+</head>
+<body>
+
+
+<script type="text/javascript">
+	/**
+	 * Mixer: adds loops and controls to the stage.
+	 */
+	var Mixer = {
+		controls	: {},
+		loops		: {},
+		mixing		: null,
+
+		init		: function()
+		{
+			this.events();
+		},
+
+		events		: function()
+		{
+			var that = this;
+
+			document.body.addEventListener('mousedown', function(e) { that.startDrag(e); }, false);
+		},
+
+		startDrag	: function(e)
+		{
+			var loops = this.loops,
+				loop,
+				$elem,
+				that = this;
+
+			for (var id in loops) {
+				loop = loops[id];
+				$elem = loop.$elem;
+				//console.log(id, $elem, $elem.offsetTop, e.clientY, $elem.offsetTop + $elem.offsetHeight);
+				if (this.overTarget($elem, e)) {
+					this.mixing = loop;
+					$elem.classList.add('dragging');
+					document.body.addEventListener('mousemove', Mixer.drag, false);
+					document.body.addEventListener('mouseup', Mixer.endDrag, false);
+
+					if (window.getSelection) {
+						var selection = window.getSelection();
+						if (selection.removeAllRanges) selection.removeAllRanges();
+					}
+
+					break;
+				}
+			}
+		},
+
+		// when called, this is scoped to the dom element
+		drag		: function(e)
+		{
+			var $elem 		= Mixer.mixing.$elem,
+				controls	= Mixer.controls,
+				control;
+
+			if ($elem) {
+				$elem.style.top = e.clientY - ($elem.offsetHeight / 2) + 'px';
+				$elem.style.left = e.clientX - ($elem.offsetWidth / 2) + 'px';
+
+				// check if we're in a control
+				for (var id in controls) {
+					control = controls[id];
+					if (Mixer.overTarget(control.self, e)) {
+						control.set(e);
+						break;
+					}
+				}
+			}
+		},
+
+		// when called, this is scoped to the dom element
+		endDrag		: function(e)
+		{
+			document.body.removeEventListener('mousemove', Mixer.drag, false);
+			document.body.removeEventListener('mouseup', Mixer.endDrag, false);
+			Mixer.mixing = null;
+			var $elem = e.srcElement || e.originalTarget;
+			$elem.classList.remove('dragging');
+		},
+
+		overTarget	: function($elem, e)
+		{
+			var result = false;
+			if (
+				$elem.offsetTop <= e.clientY && 
+				($elem.offsetTop + $elem.offsetHeight) >= e.clientY &&
+				$elem.offsetLeft <= e.clientX &&
+				($elem.offsetLeft + $elem.offsetWidth) >= e.clientX
+				) {
+				result = true;
+			}
+
+			return result;
+		},
+
+		add_control	: function(param)
+		{
+			var control = new window[param.control];
+			this.controls[control.id] = control;
+		},
+
+		add_loop	: function(param)
+		{
+			var loop = new Loop(param);
+			this.loops[loop.id] = loop;
+		},
+
+		add_group	: function(param)
+		{
+			var mediagroup = param.mediagroup || 'mediagroup',
+				loop;
+
+			for (var i = param.mp3s.length; i--; ) {
+				loop = param.mp3s[i];
+				loop.mediagroup = loop.mediagroup || mediagroup;
+				this.add_loop(loop);
+			}
+		},
+
+		has_id		: function(check_id)
+		{
+			var loops = this.loops;
+			for (var id in loops) {
+				if (id === check_id) { return true; }
+			}
+			return false;
+		}
+
+	}
+
+	/**
+	 * Gain: control to change the volume of loops based on their position relative to the box.
+	 */
+	var Gain = function(param)
+	{
+		this.init(param);
+	}
+
+	Gain.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		position: {},
+		counter	: 1,
+
+		init	: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || 'gain-' + (Gain.prototype.counter++);
+			div.className 	= param.className || 'gain';
+			div.style 		= param.style || '';
+
+			document.body.appendChild(div);
+
+			this.get_position();
+		},
+
+		get_position : function()
+		{
+			var self 	 = this.self,
+				position = this.position;
+
+			position.x = self.offsetLeft;
+			position.y = self.offsetTop;
+			position.w = self.offsetWidth;
+			position.h = self.offsetHeight;
+		},
+
+		set		: function(e)
+		{
+			var x = e.pageX,
+				y = e.pageY,
+				pos = this.position;
+
+			var volume = (1 - y / (pos.y + pos.h)).toFixed(2);
+
+			var $elem = e.srcElement || e.originalTarget;
+			if ($elem.loop) { $elem.loop.volume(volume); }
+		}
+	}
+
+	/**
+	 * Play: play a loop
+	 */
+	var Play = function(param)
+	{
+		this.init(param);
+	}
+
+	Play.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		counter	: 1,
+
+		init: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || 'play-' + (Play.prototype.counter++);
+			div.className 	= param.className || 'play';
+			div.style 		= param.style || '';
+			div.innerHTML	= 'Play';
+
+			document.body.appendChild(div);
+		},
+
+		set		: function(e)
+		{
+			var $elem = e.srcElement || e.originalTarget;
+			if ($elem && $elem.loop) { $elem.loop.play(); }
+		}
+	}
+
+	/**
+	 * Pause: pause a loop
+	 */
+	var Pause = function(param)
+	{
+		this.init(param);
+	}
+
+	Pause.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		counter	: 1,
+
+		init: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || 'pause-' + (Pause.prototype.counter++);
+			div.className 	= param.className || 'pause';
+			div.style 		= param.style || '';
+			div.innerHTML	= 'Pause';
+
+			document.body.appendChild(div);
+		},
+
+		set		: function(e)
+		{
+			var $elem = e.srcElement || e.originalTarget;
+			if ($elem.loop) { $elem.loop.pause(); }
+		}
+	}
+
+	/**
+	 * Pause: pause a loop
+	 */
+	var Stop = function(param)
+	{
+		this.init(param);
+	}
+
+	Stop.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		counter	: 1,
+
+		init: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || 'stop-' + (Stop.prototype.counter++);
+			div.className 	= param.className || 'stop';
+			div.style 		= param.style || '';
+			div.innerHTML	= 'Stop';
+
+			document.body.appendChild(div);
+		},
+
+		set		: function(e)
+		{
+			var $elem = e.srcElement || e.originalTarget;
+			if ($elem.loop) { $elem.loop.stop(); }
+		}
+	}
+
+	/**
+	 * Loop scrubber
+	 */
+	var Scrubber = function(param)
+	{
+		this.init(param);
+	}
+
+	Scrubber.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		counter	: 1,
+		listener: null,
+
+		init: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+			this.events();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || 'scrubber-' + (Scrubber.prototype.counter++);
+			div.className 	= param.className || 'scrubber';
+			div.style 		= param.style || '';
+			div.innerHTML	= '';
+
+			document.body.appendChild(div);
+		},
+
+		events	: function()
+		{
+			var that = this,
+				self = this.self;
+
+			self.addEventListener('click', function(e) { that.seek(e); }, false);
+		},
+
+		set		: function(e)
+		{
+			var $elem = this.$elem = e.srcElement || e.originalTarget;
+
+			if ($elem && $elem.loop && $elem.loop.audio) {
+				var that = this;
+				this.listener = function() { that.progress(); }
+				$elem.loop.audio.addEventListener('timeupdate', this.listener, false);
+			}
+		},
+
+		seek	: function(e)
+		{
+			var $elem		= this.$elem,
+				loop		= $elem.loop,
+				audio		= loop.audio,
+				duration	= audio.duration,
+				currentTime	= audio.currentTime,
+				self		= this.self;				
+
+			var time = (e.x - self.offsetLeft) * duration / self.offsetWidth;
+			loop.seek(time);
+		},
+
+		progress: function()
+		{
+			var $elem		= this.$elem,
+				loop		= $elem.loop,
+				audio		= loop.audio,
+				duration	= audio.duration,
+				currentTime	= audio.currentTime,
+				self		= this.self;
+
+			var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
+
+			$elem.style.left = left + 'px';
+			$elem.querySelector('var').innerHTML = currentTime + '/' + duration;
+		}
+	}
+
+	/**
+	 * Loop: mp3 file that is manipulated using the controls on the stage
+	 */
+	var Loop = function(param) 
+	{
+		this.init(param);
+	}
+
+	Loop.prototype = {
+		mp3 		: '',
+		audio 		: null,
+		mediagroup	: '',
+		muted		: false,
+		loop		: true,
+		id			: '',
+		state		: 0,
+		states		: ['pause', 'play'],
+		PAUSED		: 0,
+		PLAYING		: 1,
+		param		: null,
+		$elem		: null,
+		counter		: 1,
+
+		init : function(param)
+		{
+			this.mp3 			= param.mp3;
+			
+			var audio 			= new Audio(this.mp3);
+			audio.muted 		= param.muted || param.muted === false ? param.muted : this.muted;
+			audio.loop			= param.loop || param.loop === false ? param.loop : this.loop;
+			// TODO: take the pull path, convert invalid characters, make that the id
+			this.id 			= param.id || this.mp3.substring(this.mp3.lastIndexOf('/') + 1, this.mp3.lastIndexOf('.'));
+			if (!isNaN(this.id)) { this.id = 'audio-' + this.id; }
+			audio.id			= this.id;
+			audio.volume		= param.volume == undefined ? .5 : param.volume;
+
+			if (param.mediagroup) { this.mediagroup = audio.mediaGroup = param.mediagroup; }
+
+			this.audio 			= audio;
+
+			this.param			= param;
+
+			var that = this;
+			this.audio.addEventListener('ended', function(e) { that.ended(e); }, false);
+
+			this.create();
+		},
+
+		create : function()
+		{
+			var param		= this.param;
+
+			this.$elem = div= document.createElement('div');
+			div.id 			= 'loop-' + (Loop.prototype.counter++);
+			div.className 	= param.className || '';
+			div.className	+= ' loop';
+			div.style 		= param.style || '';
+			div.loop		= this;
+			div.innerHTML	= (param.label || div.id) + '<var></var>';
+
+			document.body.appendChild(div);
+		},
+
+		play : function()
+		{
+			if (this.state != this.PLAYING) { 
+				var audio = this.audio;
+				if (audio.controller) {
+					audio.controller.play();
+				} else {
+					audio.play();
+				}
+				this.state = this.PLAYING;
+			}
+		},
+
+		pause : function()
+		{
+			if (this.state != this.PAUSED) { 
+				this.audio.pause();
+				this.state = this.PAUSED;
+			}
+		},
+
+		stop : function()
+		{
+			if (this.state != this.PAUSED) { 
+				this.audio.pause();
+				this.state = this.PAUSED;
+			}
+
+			this.currentTime = 0;
+		},
+
+		volume : function(level) 
+		{
+			if (level < 0) level = 0;
+			if (level > 1) level = 1;
+
+			this.audio.volume = level;
+		},
+
+		seek : function(time)
+		{	
+			var audio = this.audio;
+
+			if (audio.controller) {
+				audio.controller.currentTime = time;
+			} else {
+				audio.currentTime = time;
+			}
+		},
+
+		ended : function(e)
+		{	
+			var audio = this.audio;
+			this.state = this.PAUSED;
+			if (audio.ended && audio.loop && audio.mediaGroup) {
+				this.seek(0);
+				this.play();
+				//this.play();
+			}
+		}
+	}
+
+
+
+	Mixer.init();
+	Mixer.add_control({control: 'Gain'});
+	Mixer.add_control({control: 'Play'});
+	Mixer.add_control({control: 'Pause'});
+	Mixer.add_control({control: 'Stop'});
+	Mixer.add_control({control: 'Scrubber'});
+	Mixer.add_loop({mp3:'loops/07 Stamping Ground.mp3', label:'men', markers:[{label:'machines', time:167}]});
+	Mixer.add_group({
+		meadiagroup: 'mediagroup', 
+		mp3s: [
+			{mp3:'loops/0/0.wav', volume:0, id: 'loop-0-0', volume: 0, className: 'group1', label: '0/0'}, 
+			{mp3:'loops/1/0.wav', volume:0, id: 'loop-1-0', volume: 0, className: 'group2', label: '1/0'},
+			{mp3:'loops/2/0.wav', volume:0, id: 'loop-2-0', volume: 0, className: 'group3', label: '2/0'}
+		]
+	});
+
+</script>
+
+</body>
+</html>
