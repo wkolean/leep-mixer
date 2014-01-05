@@ -72,7 +72,9 @@
 					control = controls[id];
 					if (Mixer.overTarget(control.self, e)) {
 						control.set(e);
-						break;
+						//break;
+					} else {
+						control.unset();
 					}
 				}
 			}
@@ -197,7 +199,9 @@
 
 			var $elem = e.srcElement || e.originalTarget;
 			if ($elem.loop) { $elem.loop.volume(volume); }
-		}
+		},
+
+		unset	: function() {}
 	}
 
 	/**
@@ -240,7 +244,9 @@
 		{
 			var $elem = e.srcElement || e.originalTarget;
 			if ($elem && $elem.loop) { $elem.loop.play(); }
-		}
+		},
+
+		unset	: function() {}
 	}
 
 	/**
@@ -283,7 +289,9 @@
 		{
 			var $elem = e.srcElement || e.originalTarget;
 			if ($elem.loop) { $elem.loop.pause(); }
-		}
+		},
+
+		unset	: function() {}
 	}
 
 	/**
@@ -326,7 +334,9 @@
 		{
 			var $elem = e.srcElement || e.originalTarget;
 			if ($elem.loop) { $elem.loop.stop(); }
-		}
+		},
+
+		unset	: function() {}
 	}
 
 	/**
@@ -377,12 +387,22 @@
 
 		set		: function(e)
 		{
+			if (this.listener) { return; }
 			var $elem = this.$elem = e.srcElement || e.originalTarget;
 
-			if ($elem && $elem.loop && $elem.loop.audio) {
+			if ($elem && $elem.loop/* && $elem.loop.audio*/) {
+				$elem.loop.play();
 				var that = this;
 				this.listener = function() { that.progress(); }
 				$elem.loop.audio.addEventListener('timeupdate', this.listener, false);
+			}
+		},
+
+		unset	: function()
+		{
+			if (this.$elem && this.$elem.loop && this.$elem.loop.audio) {
+				this.$elem.loop.audio.removeEventListener('timeupdate', this.listener, false);
+				this.$elem = this.listener = null;
 			}
 		},
 
