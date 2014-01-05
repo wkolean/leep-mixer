@@ -348,12 +348,13 @@
 	}
 
 	Scrubber.prototype = {
-		id		: '',
-		self	: null,
-		$elem	: null,
-		param	: null,
-		counter	: 1,
-		listener: null,
+		id				: '',
+		self			: null,
+		$elem			: null,
+		param			: null,
+		counter			: 1,
+		listener		: null,
+		scrubStartTime	: 0,
 
 		init: function(param)
 		{
@@ -428,10 +429,12 @@
 				currentTime	= audio.currentTime,
 				self		= this.self;
 
-			var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
-
-			$elem.style.left = left + 'px';
 			$elem.querySelector('var').innerHTML = currentTime + '/' + duration;
+			
+			if (!$elem.classList.contains('dragging')) {
+				var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
+				$elem.style.left = left + 'px';
+			}	
 		}
 	}
 
