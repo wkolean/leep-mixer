@@ -16,9 +16,22 @@
 		controls	: {},
 		loops		: {},
 		mixing		: null,
+		context		: null,
 
 		init		: function()
 		{
+			var AudioContext = (
+				window.AudioContext ||
+				window.webkitAudioContext ||
+				window.mozAudioContext ||
+				window.oAudioContext ||
+				window.msAudioContext
+			)
+
+			if (AudioContext) {
+				this.context = new AudioContext();
+			}
+
 			this.events();
 		},
 
@@ -114,6 +127,8 @@
 		add_loop	: function(param)
 		{
 			var loop = new Loop(param);
+			loop.source = this.context.createMediaElementSource(loop.audio);
+			loop.source.connect(this.context.destination);
 			this.loops[loop.id] = loop;
 		},
 
@@ -434,7 +449,10 @@
 			if (!$elem.classList.contains('dragging')) {
 				var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
 				$elem.style.left = left + 'px';
-			}	
+			} else {
+				console.log(loop.source);
+				loop.source.playbackRate.value = 4;
+			}
 		}
 	}
 
@@ -460,6 +478,7 @@
 		param		: null,
 		$elem		: null,
 		counter		: 1,
+		source		: null,
 
 		init : function(param)
 		{
@@ -508,7 +527,8 @@
 				if (audio.controller) {
 					audio.controller.play();
 				} else {
-					audio.play();
+					//audio.play();
+					this.source.mediaElement.play();
 				}
 				this.state = this.PLAYING;
 			}
