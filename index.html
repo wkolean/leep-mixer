@@ -127,8 +127,8 @@
 		add_loop	: function(param)
 		{
 			var loop = new Loop(param);
-			loop.source = this.context.createMediaElementSource(loop.audio);
-			loop.source.connect(this.context.destination);
+			//loop.source = this.context.createMediaElementSource(loop.audio);
+			//loop.source.connect(this.context.destination);
 			this.loops[loop.id] = loop;
 		},
 
@@ -151,6 +151,19 @@
 				if (id === check_id) { return true; }
 			}
 			return false;
+		},
+
+		play_group	: function(mediagroup)
+		{
+			var loops = this.loops,
+				loop;
+
+			for (var id in loops) {
+				loop = loops[id];
+				if (loop.param.mediagroup == mediagroup && loop.state != loop.PLAYING) {
+					loop.play();
+				}
+			}
 		}
 
 	}
@@ -170,6 +183,7 @@
 		param	: null,
 		position: {},
 		counter	: 1,
+		name	: 'gain',
 
 		init	: function(param)
 		{
@@ -184,8 +198,8 @@
 			var param = this.param;
 
 			var div = this.self = document.createElement('div');
-			div.id 			= this.id = param.id || 'gain-' + (Gain.prototype.counter++);
-			div.className 	= param.className || 'gain';
+			div.id 			= this.id = param.id || this.name + '-' + (Gain.prototype.counter++);
+			div.className 	= param.className || this.name;
 			div.style 		= param.style || '';
 
 			document.body.appendChild(div);
@@ -278,6 +292,7 @@
 		$elem	: null,
 		param	: null,
 		counter	: 1,
+		name	: 'pause',
 
 		init: function(param)
 		{
@@ -292,8 +307,8 @@
 			var param = this.param;
 
 			var div = this.self = document.createElement('div');
-			div.id 			= this.id = param.id || 'pause-' + (Pause.prototype.counter++);
-			div.className 	= param.className || 'pause';
+			div.id 			= this.id = param.id || this.name + '-' + (Pause.prototype.counter++);
+			div.className 	= param.className || this.name;
 			div.style 		= param.style || '';
 			div.innerHTML	= 'Pause';
 
@@ -323,6 +338,7 @@
 		$elem	: null,
 		param	: null,
 		counter	: 1,
+		name	: 'stop',
 
 		init: function(param)
 		{
@@ -337,8 +353,8 @@
 			var param = this.param;
 
 			var div = this.self = document.createElement('div');
-			div.id 			= this.id = param.id || 'stop-' + (Stop.prototype.counter++);
-			div.className 	= param.className || 'stop';
+			div.id 			= this.id = param.id || this.name + '-' + (Stop.prototype.counter++);
+			div.className 	= param.className || this.name;
 			div.style 		= param.style || '';
 			div.innerHTML	= 'Stop';
 
@@ -349,6 +365,93 @@
 		{
 			var $elem = e.srcElement || e.originalTarget;
 			if ($elem.loop) { $elem.loop.stop(); }
+		},
+
+		unset	: function() {}
+	}
+
+	/**
+	 * Web Audio API Filter
+	 */
+	var Filter = function(param)
+	{
+		this.init(param);
+	}
+
+	Filter.prototype = {
+		id		: '',
+		self	: null,
+		$elem	: null,
+		param	: null,
+		counter	: 1,
+		name	: 'filter',
+
+		init: function(param)
+		{
+			param 			= param || {};
+			this.param		= param;
+
+			this.create();
+		},
+
+		create	: function()
+		{
+			var param = this.param;
+
+			var div = this.self = document.createElement('div');
+			div.id 			= this.id = param.id || this.name + '-' + (Filter.prototype.counter++);
+			div.className 	= param.className || this.name;
+			div.style 		= param.style || '';
+
+			document.body.appendChild(div);
+		},
+
+		set		: function(e)
+		{
+			var $elem = e.srcElement || e.originalTarget,
+				loop, source;
+
+			if ((loop = $elem.loop) && (source = $elem.loop.source)) {
+				if (loop.filter) {
+					loop.filter.frequency.value = this.frequency(e);
+					//loop.filter.Q.value = this.quality(e);
+				} else {
+					var filter = loop.filter || Mixer.context.createBiquadFilter();
+					source.connect(filter);
+					filter.connect(loop.gain);
+					
+					filter.type = 0; // Low-pass filter. See BiquadFilterNode docs
+					filter.frequency.value = this.frequency(e);
+					//filter.Q.value = this.quality(e);
+					loop.filter = filter;
+				}
+			}
+		},
+
+		frequency	: function(e)
+		{
+			var self	= this.self,
+				height 	= self.offsetHeight,
+				pos		= {x: e.x - self.offsetWidth, y: e.y - self.offsetTop},
+				MIN		= 40,
+				MAX		= Mixer.context.sampleRate / 2,
+				hz;
+
+			hz = pos.x * 20000 / height;
+			if (hz < MIN) { hz = MIN; }
+			if (hz > MAX) { hz = MAX; }
+			return hz;
+		},
+
+		quality		: function(e)
+		{
+			var self	= this.self,
+				width	= self.offsetWidth;
+				pos		= {x: e.x - self.offsetWidth, y: e.y - self.offsetTop};
+
+			var q = pos.y * 30;
+
+			return q;
 		},
 
 		unset	: function() {}
@@ -368,8 +471,10 @@
 		$elem			: null,
 		param			: null,
 		counter			: 1,
+		name			: 'scrubber',
 		listener		: null,
 		scrubStartTime	: 0,
+		animationFunc	: null,
 
 		init: function(param)
 		{
@@ -385,8 +490,8 @@
 			var param = this.param;
 
 			var div = this.self = document.createElement('div');
-			div.id 			= this.id = param.id || 'scrubber-' + (Scrubber.prototype.counter++);
-			div.className 	= param.className || 'scrubber';
+			div.id 			= this.id = param.id || this.name + '-' + (Scrubber.prototype.counter++);
+			div.className 	= param.className || this.name;
 			div.style 		= param.style || '';
 			div.innerHTML	= '';
 
@@ -399,6 +504,12 @@
 				self = this.self;
 
 			self.addEventListener('click', function(e) { that.seek(e); }, false);
+			self.addEventListener('mousedown', function(e) { that.scrub(e); }, false);
+			self.addEventListener('mouseup', function(e) { that.unscrub(e); }, false);
+
+			window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+			this.animationFunc = function() { that.progress(); }
+			requestAnimationFrame(this.animationFunc);
 		},
 
 		set		: function(e)
@@ -408,9 +519,11 @@
 
 			if ($elem && $elem.loop/* && $elem.loop.audio*/) {
 				$elem.loop.play();
-				var that = this;
-				this.listener = function() { that.progress(); }
-				$elem.loop.audio.addEventListener('timeupdate', this.listener, false);
+				if ($elem.loop.audio) {
+					var that = this;
+					this.listener = function() { that.progress(); }
+					$elem.loop.audio.addEventListener('timeupdate', this.listener, false);
+				}
 			}
 		},
 
@@ -424,35 +537,65 @@
 
 		seek	: function(e)
 		{
-			var $elem		= this.$elem,
-				loop		= $elem.loop,
-				audio		= loop.audio,
-				duration	= audio.duration,
-				currentTime	= audio.currentTime,
-				self		= this.self;				
+			if (this.$elem) {
+				var $elem		= this.$elem,
+					loop		= $elem.loop,
+					duration	= loop.duration(),
+					currentTime	= loop.currentTime(),
+					self		= this.self;				
 
-			var time = (e.x - self.offsetLeft) * duration / self.offsetWidth;
-			loop.seek(time);
+				var time = (e.x - self.offsetLeft) * duration / self.offsetWidth;
+				loop.seek(time);
+			}
+		},
+
+		scrub	: function(e)
+		{
+			if (this.$elem) {
+				var $elem		= this.$elem,
+					loop		= $elem.loop;
+
+				if (loop.source) {
+					loop.source.playbackRate.value = 4;
+				} else {
+					loop.audio.playbackRate = 4;
+				}
+			}
+		},
+
+		unscrub	: function(e)
+		{
+			if (this.$elem) {
+				var $elem		= this.$elem,
+					loop		= $elem.loop;
+
+				if (loop.source) {
+					loop.source.playbackRate.value = 1;
+				} else {
+					loop.audio.playbackRate = 1;
+				}
+			}
 		},
 
 		progress: function()
 		{
-			var $elem		= this.$elem,
-				loop		= $elem.loop,
-				audio		= loop.audio,
-				duration	= audio.duration,
-				currentTime	= audio.currentTime,
-				self		= this.self;
+			if (this.$elem && this.$elem.loop) {
+				var $elem		= this.$elem,
+					loop		= $elem.loop,
+					source		= loop.source,
+					duration	= loop.duration(),
+					currentTime	= loop.currentTime(),
+					self		= this.self;
 
-			$elem.querySelector('var').innerHTML = currentTime + '/' + duration;
-			
-			if (!$elem.classList.contains('dragging')) {
-				var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
-				$elem.style.left = left + 'px';
-			} else {
-				console.log(loop.source);
-				loop.source.playbackRate.value = 4;
+				$elem.querySelector('var').innerHTML = currentTime + '/' + duration;
+				
+				if (!$elem.classList.contains('dragging')) {
+					var left = (self.offsetWidth * currentTime / duration) + self.offsetLeft;
+					$elem.style.left = left + 'px';
+				}
 			}
+
+			requestAnimationFrame(this.animationFunc);
 		}
 	}
 
@@ -479,17 +622,35 @@
 		$elem		: null,
 		counter		: 1,
 		source		: null,
+		buffer		: null,
+		api			: true,
+		gain		: null,
+		startTime	: 0,
+		seekTime	: 0,
 
 		init : function(param)
 		{
+			this.param			= param;
 			this.mp3 			= param.mp3;
+			this.api			= param.api || param.api === false ? param.api : this.api;
+			this.id 			= param.id || this.mp3.substring(this.mp3.lastIndexOf('/') + 1, this.mp3.lastIndexOf('.'));
+			if (!isNaN(this.id)) { this.id = 'audio-' + this.id; }
+
+			if (this.api) {
+				this.init_api(param);
+			} else {
+				this.init_audio(param);
+			}
 			
+			this.create();
+		},
+
+		init_audio : function(param)
+		{
 			var audio 			= new Audio(this.mp3);
 			audio.muted 		= param.muted || param.muted === false ? param.muted : this.muted;
 			audio.loop			= param.loop || param.loop === false ? param.loop : this.loop;
 			// TODO: take the pull path, convert invalid characters, make that the id
-			this.id 			= param.id || this.mp3.substring(this.mp3.lastIndexOf('/') + 1, this.mp3.lastIndexOf('.'));
-			if (!isNaN(this.id)) { this.id = 'audio-' + this.id; }
 			audio.id			= this.id;
 			audio.volume		= param.volume == undefined ? .5 : param.volume;
 
@@ -497,12 +658,39 @@
 
 			this.audio 			= audio;
 
-			this.param			= param;
-
 			var that = this;
 			this.audio.addEventListener('ended', function(e) { that.ended(e); }, false);
+		},
 
-			this.create();
+		init_api : function(param)
+		{
+			var that	= this,
+				request = new XMLHttpRequest();
+			
+			request.open('GET', this.mp3, true);
+			request.responseType = 'arraybuffer';
+
+			request.onload = function() {
+				Mixer.context.decodeAudioData(request.response, function(buffer) {
+					that.source = Mixer.context.createBufferSource();
+					that.buffer = buffer;
+
+					that.gain = Mixer.context.createGain();
+					that.gain.connect(Mixer.context.destination);
+
+					that.source.buffer = buffer
+					that.source.connect(that.gain);
+
+					if (that.param.mediagroup) { 
+						that.source.loop = true;
+						that.gain.gain.value = 0;
+					}
+
+					console.log(that.source);
+				}, function() { console.log('error'); });
+			}
+
+			request.send();
 		},
 
 		create : function()
@@ -520,24 +708,38 @@
 			document.body.appendChild(div);
 		},
 
-		play : function()
+		play : function(seekTime)
 		{
 			if (this.state != this.PLAYING) { 
-				var audio = this.audio;
-				if (audio.controller) {
-					audio.controller.play();
+				if (this.source) {
+					this.startTime = Mixer.context.currentTime;
+					this.seekTime = seekTime || 0;
+					this.source.start(0, this.seekTime);
 				} else {
-					//audio.play();
-					this.source.mediaElement.play();
+					var audio = this.audio;
+					if (audio.controller) {
+						audio.controller.play();
+					} else {
+						audio.play();
+					}
 				}
 				this.state = this.PLAYING;
+				if (this.param.mediagroup && this.source) { Mixer.play_group(this.param.mediagroup); }
 			}
 		},
 
 		pause : function()
 		{
 			if (this.state != this.PAUSED) { 
-				this.audio.pause();
+				if (this.source) {
+					if (this.param.mediagroup) {
+						this.volume(0);
+					} else {
+						this.source.stop(0);
+					}
+				} else {
+					this.audio.pause();
+				}
 				this.state = this.PAUSED;
 			}
 		},
@@ -545,7 +747,15 @@
 		stop : function()
 		{
 			if (this.state != this.PAUSED) { 
-				this.audio.pause();
+				if (this.source) {
+					if (this.param.mediagroup) {
+						this.volume(0);
+					} else {
+						this.source.stop(0);
+					}
+				} else {
+					this.audio.pause();
+				}
 				this.state = this.PAUSED;
 			}
 
@@ -557,17 +767,26 @@
 			if (level < 0) level = 0;
 			if (level > 1) level = 1;
 
-			this.audio.volume = level;
+			if (this.gain) {
+				this.gain.gain.value = level;
+			} else {
+				this.audio.volume = level;
+			}
 		},
 
-		seek : function(time)
-		{	
-			var audio = this.audio;
-
-			if (audio.controller) {
-				audio.controller.currentTime = time;
+		seek : function(seekTime)
+		{
+			if (this.source) {
+				this.source.stop(0);
+				this.play(0, seekTime);
 			} else {
-				audio.currentTime = time;
+				var audio = this.audio;
+
+				if (audio.controller) {
+					audio.controller.currentTime = seekTime;
+				} else {
+					audio.currentTime = seekTime;
+				}
 			}
 		},
 
@@ -580,6 +799,24 @@
 				this.play();
 				//this.play();
 			}
+		},
+
+		currentTime : function()
+		{
+			var result = 0;
+
+			if (this.source) {
+				result = Mixer.context.currentTime - this.startTime + this.seekTime;
+			} else {
+				result = this.audio.currentTime;
+			}
+
+			return result;
+		},
+
+		duration : function()
+		{
+			return this.source ? this.source.buffer.duration : this.audio.duration;
 		}
 	}
 
@@ -591,7 +828,8 @@
 	Mixer.add_control({control: 'Pause'});
 	Mixer.add_control({control: 'Stop'});
 	Mixer.add_control({control: 'Scrubber'});
-	Mixer.add_loop({mp3:'loops/07 Stamping Ground.mp3', label:'men', markers:[{label:'machines', time:167}]});
+	Mixer.add_control({control: 'Filter'})
+	Mixer.add_loop({mp3:'loops/07 Stamping Ground.mp3', label:'men', markers:[{label:'machines', time:167}], api:false});
 	Mixer.add_group({
 		meadiagroup: 'mediagroup', 
 		mp3s: [

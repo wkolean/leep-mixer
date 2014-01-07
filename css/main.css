@@ -72,9 +72,20 @@ html, body {
 	width: 800px;
 	height: 50px;
 	position: absolute;
-	bottom: 50%;
+	bottom: 25%;
 	left: 50%;
 	margin-left: -401px;
 	margin-top: 25px;
 	background: #555;
+}
+
+.filter {
+	text-align: center;
+	border: solid 1px;
+	background: #0c0;
+	width: 200px;
+	height: 200px;
+	position: absolute;
+	top: 10px;
+	right: 50px;
 }
