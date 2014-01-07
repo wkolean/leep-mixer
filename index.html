@@ -519,6 +519,15 @@
 
 			if ($elem && $elem.loop/* && $elem.loop.audio*/) {
 				$elem.loop.play();
+				if ($elem.loop.param.markers) {
+					var markers = $elem.loop.param.markers;
+					for (var i = markers.length; i--; ) {
+						var div = document.createElement('div');
+						div.className = 'marker';
+						div.style.left = markers[i].left + 'px';
+						this.self.appendChild(div);
+					}
+				}
 				if ($elem.loop.audio) {
 					var that = this;
 					this.listener = function() { that.progress(); }
@@ -558,7 +567,7 @@
 				if (loop.source) {
 					loop.source.playbackRate.value = 4;
 				} else {
-					loop.audio.playbackRate = 4;
+					loop.audio.playbackRate = -2;
 				}
 			}
 		},
@@ -674,6 +683,9 @@
 				Mixer.context.decodeAudioData(request.response, function(buffer) {
 					that.source = Mixer.context.createBufferSource();
 					that.buffer = buffer;
+					for (var prop in buffer) {
+						console.log(prop, buffer[prop]);
+					}
 
 					that.gain = Mixer.context.createGain();
 					that.gain.connect(Mixer.context.destination);
@@ -829,7 +841,7 @@
 	Mixer.add_control({control: 'Stop'});
 	Mixer.add_control({control: 'Scrubber'});
 	Mixer.add_control({control: 'Filter'})
-	Mixer.add_loop({mp3:'loops/07 Stamping Ground.mp3', label:'men', markers:[{label:'machines', time:167}], api:false});
+	Mixer.add_loop({mp3:'loops/07 Stamping Ground.mp3', label:'men', markers:[{label:'machines', time:167, left:428}], api:false});
 	Mixer.add_group({
 		meadiagroup: 'mediagroup', 
 		mp3s: [
